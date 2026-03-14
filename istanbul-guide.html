@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Istanbul Visitor's Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* =============================================
+   THEME — edit colours and fonts here
+   ============================================= */
+:root {
+  --accent-cihangir: #D85A30;
+  --accent-karakoy: #378ADD;
+  --bg: #ffffff;
+  --bg-secondary: #f7f6f3;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666;
+  --border: rgba(0,0,0,0.12);
+  --font: system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text-primary); }
+
+.guide-wrap {
+  display: flex;
+  height: 100dvh;
+}
+
+/* Sidebar */
+#guide-sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border-right: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-head {
+  padding: 16px;
+  border-bottom: 0.5px solid var(--border);
+}
+.sb-head h1 { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.sb-head p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.sb-body { padding: 12px; overflow-y: auto; flex: 1; }
+
+/* Neighbourhood chips */
+.section-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-secondary); margin-bottom: 8px;
+}
+.nh-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  margin-bottom: 7px;
+}
+.nh-chip:hover { background: #eee; }
+.nh-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.nh-chip-name { font-size: 13px; font-weight: 500; }
+.nh-chip-sub { font-size: 11px; color: var(--text-secondary); }
+
+/* Detail panel */
+.nh-detail { display: none; }
+.nh-detail.active { display: block; }
+.back-btn {
+  font-size: 11px; color: var(--text-secondary);
+  background: none; border: none; cursor: pointer;
+  padding: 4px 0; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 3px;
+}
+.back-btn:hover { color: var(--text-primary); }
+.nh-title { font-size: 16px; font-weight: 600; margin-bottom: 5px; }
+.nh-blurb { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px; }
+
+/* Location cards */
+.loc-card {
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg);
+}
+.loc-card:hover { border-color: rgba(0,0,0,0.3); }
+.loc-card img { width: 100%; height: 80px; object-fit: cover; display: block; }
+.loc-body { padding: 8px 10px; }
+.loc-name { font-size: 12px; font-weight: 600; margin-bottom: 1px; }
+.loc-type { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.loc-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+
+/* Map */
+#guide-map { flex: 1; }
+
+/* Popup */
+.leaflet-popup-content-wrapper { border-radius: 8px !important; box-shadow: 0 2px 10px rgba(0,0,0,0.15) !important; padding: 0 !important; }
+.leaflet-popup-content { margin: 0 !important; }
+.cpop { padding: 9px 12px; }
+.cpop-name { font-size: 12px; font-weight: 600; color: #111; margin-bottom: 2px; }
+.cpop-type { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* Mobile */
+@media (max-width: 600px) {
+  .guide-wrap { flex-direction: column; }
+  #guide-sidebar { width: 100%; height: 45%; border-right: none; border-bottom: 0.5px solid var(--border); }
+  #guide-map { height: 55%; }
+}
+</style>
+</head>
+<body>
+<div class="guide-wrap">
+  <div id="guide-sidebar">
+    <div class="sb-head">
+      <h1>Istanbul visitor's guide</h1>
+      <p>Click a neighbourhood on the map or in the list to explore</p>
+    </div>
+    <div class="sb-body">
+      <div id="intro-panel">
+        <p class="section-label">Neighbourhoods</p>
+        <div class="nh-chip" onclick="selectNH('cihangir')">
+          <div class="nh-dot" style="background:var(--accent-cihangir)"></div>
+          <div>
+            <div class="nh-chip-name">Cihangir</div>
+            <div class="nh-chip-sub">Bohemian hill village</div>
+          </div>
+        </div>
+        <div class="nh-chip" onclick="selectNH('karakoy')">
+          <div class="nh-dot" style="background:var(--accent-karakoy)"></div>
+          <div>
+            <div class="nh-chip-name">Karaköy</div>
+            <div class="nh-chip-sub">Waterfront district</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nh-detail" id="detail-cihangir">
+        <button class="back-btn" onclick="resetView()">← all neighbourhoods</button>
+        <div class="nh-title">Cihangir</div>
+        <div class="nh-blurb">A bohemian hilltop neighbourhood beloved by artists, writers and expats. Known for antique shops, cosy cafés, and sweeping Bosphorus views.</div>
+        <div id="locs-cihangir"></div>
+      </div>
+
+      <div class="nh-detail" id="detail-karakoy">
+        <button class="back-btn" onclick="resetView()">← all neighbourhoods</button>
+        <div class="nh-title">Karaköy</div>
+        <div class="nh-blurb">A buzzing waterfront district at the foot of Galata Bridge — legendary pastry houses, artisan coffee, and a beautifully restored Ottoman hamam.</div>
+        <div id="locs-karakoy"></div>
+      </div>
+    </div>
+  </div>
+  <div id="guide-map"></div>
+</div>
+
+<script>
+/* =============================================
+   DATA — edit neighbourhoods and locations here
+   ============================================= */
+const DATA = {
+  cihangir: {
+    name: "Cihangir",
+    color: "#D85A30",
+    /* Polygon boundary — list of [lat, lng] pairs */
+    polygon: [
+      [41.0375,28.9790],[41.0382,28.9858],[41.0365,28.9925],
+      [41.0340,28.9940],[41.0310,28.9915],[41.0285,28.9870],
+      [41.0290,28.9810],[41.0320,28.9785]
+    ],
+    locations: [
+      {
+        name: "Cihangir Kahvesi",
+        type: "Café",
+        desc: "Classic neighbourhood café with a shaded terrace — perfect for a slow morning",
+        lat: 41.0338, lng: 28.9872,
+        img: "https://picsum.photos/seed/cih1/270/80"
+      },
+      {
+        name: "Firuzağa Meydanı",
+        type: "Square",
+        desc: "Leafy square where locals walk dogs and read on sunny afternoons",
+        lat: 41.0348, lng: 28.9858,
+        img: "https://picsum.photos/seed/cih2/270/80"
+      },
+      {
+        name: "Antique shops",
+        type: "Shopping",
+        desc: "A cluster of antique and curiosity shops along the main street",
+        lat: 41.0330, lng: 28.9890,
+        img: "https://picsum.photos/seed/cih3/270/80"
+      },
+      {
+        name: "Bosphorus viewpoint",
+        type: "View",
+        desc: "Walk to the edge of the hill for sweeping views over the strait",
+        lat: 41.0305, lng: 28.9820,
+        img: "https://picsum.photos/seed/cih4/270/80"
+      }
+    ]
+  },
+  karakoy: {
+    name: "Karaköy",
+    color: "#378ADD",
+    polygon: [
+      [41.0268,28.9690],[41.0272,28.9762],[41.0264,28.9825],
+      [41.0240,28.9842],[41.0210,28.9820],[41.0198,28.9775],
+      [41.0200,28.9705],[41.0225,28.9678]
+    ],
+    locations: [
+      {
+        name: "Karaköy Güllüoğlu",
+        type: "Pastry",
+        desc: "Istanbul's most iconic baklava house — go first thing in the morning",
+        lat: 41.0228, lng: 28.9746,
+        img: "https://picsum.photos/seed/kar1/270/80"
+      },
+      {
+        name: "Galata Bridge",
+        type: "Landmark",
+        desc: "Walk across and watch fishermen — grab a fish sandwich from the boats below",
+        lat: 41.0223, lng: 28.9703,
+        img: "https://picsum.photos/seed/kar2/270/80"
+      },
+      {
+        name: "Karaköy Lokal",
+        type: "Brunch",
+        desc: "Excellent Turkish breakfast — try the menemen and fresh simit",
+        lat: 41.0242, lng: 28.9770,
+        img: "https://picsum.photos/seed/kar3/270/80"
+      },
+      {
+        name: "Kılıç Ali Paşa Hamamı",
+        type: "Hamam",
+        desc: "Beautifully restored 16th-century Ottoman bathhouse — book in advance",
+        lat: 41.0252, lng: 28.9753,
+        img: "https://picsum.photos/seed/kar4/270/80"
+      }
+    ]
+  }
+};
+
+/* =============================================
+   MAP SETUP
+   ============================================= */
+const map = L.map('guide-map', { center: [41.026, 28.977], zoom: 14 });
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+  maxZoom: 19
+}).addTo(map);
+
+let activeKey = null, pins = [];
+const polys = {};
+
+function clearPins() { pins.forEach(m => map.removeLayer(m)); pins = []; }
+
+function makePin(color) {
+  return L.divIcon({
+    html: `<div style="width:13px;height:13px;border-radius:50%;background:${color};border:2.5px solid white;box-shadow:0 1px 5px rgba(0,0,0,0.4)"></div>`,
+    className: '', iconSize: [13,13], iconAnchor: [6,6], popupAnchor: [0,-10]
+  });
+}
+
+function resetView() {
+  activeKey = null;
+  clearPins();
+  document.getElementById('intro-panel').style.display = '';
+  document.querySelectorAll('.nh-detail').forEach(d => d.classList.remove('active'));
+  Object.values(polys).forEach(p => p.setStyle({ fillOpacity: 0.2, weight: 2 }));
+  map.flyTo([41.026, 28.977], 14, { duration: 1 });
+}
+
+function selectNH(key) {
+  const nh = DATA[key];
+  activeKey = key;
+  document.getElementById('intro-panel').style.display = 'none';
+  document.querySelectorAll('.nh-detail').forEach(d => d.classList.remove('active'));
+  document.getElementById('detail-' + key).classList.add('active');
+  Object.entries(polys).forEach(([k, p]) =>
+    p.setStyle(k === key
+      ? { fillOpacity: 0.38, weight: 2.5 }
+      : { fillOpacity: 0.08, weight: 1.5 })
+  );
+  map.flyToBounds(polys[key].getBounds().pad(0.35), { duration: 1.2 });
+  clearPins();
+  const container = document.getElementById('locs-' + key);
+  container.innerHTML = '';
+  nh.locations.forEach((loc) => {
+    const card = document.createElement('div');
+    card.className = 'loc-card';
+    card.innerHTML = `
+      <img src="${loc.img}" alt="${loc.name}"/>
+      <div class="loc-body">
+        <div class="loc-name">${loc.name}</div>
+        <div class="loc-type">${loc.type}</div>
+        <div class="loc-desc">${loc.desc}</div>
+      </div>`;
+    const marker = L.marker([loc.lat, loc.lng], { icon: makePin(nh.color) })
+      .addTo(map)
+      .bindPopup(`<div class="cpop"><div class="cpop-name">${loc.name}</div><div class="cpop-type">${loc.type}</div></div>`, { maxWidth: 180 });
+    pins.push(marker);
+    card.addEventListener('click', () => {
+      map.flyTo([loc.lat, loc.lng], 17, { duration: 0.9 });
+      setTimeout(() => marker.openPopup(), 950);
+    });
+    marker.on('click', () => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    container.appendChild(card);
+  });
+}
+
+/* Draw polygons and labels */
+Object.entries(DATA).forEach(([key, nh]) => {
+  const poly = L.polygon(nh.polygon, {
+    color: nh.color, fillColor: nh.color, fillOpacity: 0.2, weight: 2
+  }).addTo(map);
+  const centre = poly.getBounds().getCenter();
+  L.marker(centre, {
+    icon: L.divIcon({
+      html: `<div style="font-size:11px;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap;pointer-events:none">${nh.name}</div>`,
+      className: '', iconAnchor: [28, 8]
+    }), interactive: false
+  }).addTo(map);
+  poly.on('mouseover', () => { if (activeKey !== key) poly.setStyle({ fillOpacity: 0.38 }); });
+  poly.on('mouseout',  () => { if (activeKey !== key) poly.setStyle({ fillOpacity: 0.2 }); });
+  poly.on('click', () => selectNH(key));
+  polys[key] = poly;
+});
+</script>
+</body>
+</html>
